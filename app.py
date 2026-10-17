@@ -151,10 +151,41 @@ st.session_state.setdefault("n_eval", 0)
 st.session_state.setdefault("ahorro_min", 0.0)
 st.session_state.setdefault("costo_total", 0.0)
 
+# ---------- Login: el rol viene del usuario autenticado, no de un selector ----------
+if "rol" not in st.session_state:
+    st.title("SafeGuard")
+    st.markdown("##### Ingresa con tu usuario")
+    if not security.hay_usuarios():
+        st.error("No hay usuarios creados. En la terminal ejecuta: python crear_usuarios.py")
+        st.stop()
+    intentos = st.session_state.get("intentos", 0)
+    if intentos >= 5:
+        st.error("Demasiados intentos fallidos. Recarga la página para volver a intentar.")
+        st.stop()
+    with st.form("login"):
+        usuario_in = st.text_input("Usuario")
+        clave_in = st.text_input("Contraseña", type="password")
+        if st.form_submit_button("Ingresar", type="primary", use_container_width=True):
+            rol_ok = security.verificar_login(usuario_in, clave_in)
+            if rol_ok:
+                st.session_state.update(rol=rol_ok, usuario=usuario_in.strip().lower())
+                skills.registrar_auditoria("login", {"rol": rol_ok}, st.session_state["usuario"])
+                st.rerun()
+            st.session_state["intentos"] = intentos + 1
+            skills.registrar_auditoria("login_fallido", {"usuario": usuario_in[:40]})
+            st.error("Usuario o contraseña incorrectos.")
+    st.stop()
+rol = st.session_state["rol"]
+
 # ---------- Barra lateral: identidad, modo y seguridad ----------
 with st.sidebar:
     st.markdown("### Usuario")
-    rol = st.selectbox("Tu rol", list(security.PERMISOS), index=1)
+    st.write(f"**{st.session_state['usuario']}** · {rol}")
+    if st.button("Cerrar sesión"):
+        skills.registrar_auditoria("logout", {}, st.session_state["usuario"])
+        for k in ("rol", "usuario", "resultado", "autorizada", "cierre"):
+            st.session_state.pop(k, None)
+        st.rerun()
     st.markdown("### Estado del sistema")
     st.write(f"Motor: **{'Agentes IA (Claude)' if agents.modo_ia() else 'Modo demo sin conexión'}**")
     st.write(f"Historial cargado: **{len(df)} incidentes**")
@@ -168,7 +199,7 @@ st.markdown("##### Antes de iniciar una tarea, revisa qué salió mal antes en t
 
 paso1, paso2, paso3 = st.columns(3)
 for col, n, txt in [(paso1, "1", "Describe la tarea"), (paso2, "2", "4 agentes la analizan"), (paso3, "3", "Tú decides")]:
-    col.markdown(f"<div style='padding:12px;border-radius:12px;background:#F1F4F8;text-align:center'>"
+    col.markdown(f"<div style='padding:12px;border-radius:12px;background:#F1F4F8;color:#1F2328;text-align:center'>"
                  f"<b style='color:#2F6FC4'>Paso {n}</b><br>{txt}</div>", unsafe_allow_html=True)
 
 st.divider()

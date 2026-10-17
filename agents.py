@@ -12,6 +12,18 @@ from typing import Callable
 import contractor_agent
 import skills
 
+
+def _cargar_env() -> None:
+    """Lee .env (si existe) para no escribir la clave en la terminal. .env está en .gitignore."""
+    archivo = os.path.join(os.path.dirname(__file__), ".env")
+    if os.path.exists(archivo):
+        for linea in open(archivo, encoding="utf-8"):
+            if "=" in linea and not linea.lstrip().startswith("#"):
+                k, v = linea.split("=", 1)
+                os.environ.setdefault(k.strip(), v.strip().strip('"').strip("'"))
+
+
+_cargar_env()
 MODELO = os.getenv("ANTHROPIC_MODEL", "claude-sonnet-5-5")
 # USD por millón de tokens (entrada, salida), precios públicos de la API de Anthropic
 PRECIOS = {"claude-sonnet-5-5": (2.0, 10.0), "claude-sonnet-5": (2.0, 10.0), "claude-opus-5-5": (4.0, 20.0),
