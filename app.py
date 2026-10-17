@@ -1,6 +1,8 @@
 """SafeGuard — Permiso de trabajo inteligente. Ejecutar: streamlit run app.py"""
+import html
 import os
 import re
+import time
 
 import streamlit as st
 
@@ -39,6 +41,69 @@ def datos():
 
 def linea_evento(ev: dict) -> str:
     return f"{AVATARES.get(ev['agente'], '•')} **{ev['agente']}** · {TIPOS.get(ev['tipo'], ev['tipo'])}: {ev['texto']}"
+
+
+# ---------- Monitor de agentes: quién está trabajando y con quién interactúa ----------
+MONITOR = {agents.ANALISTA: ("Analista", "Busca incidentes parecidos y responde al Crítico"),
+           "Regla de riesgo": ("Regla de riesgo", "Calcula el puntaje 0-100 (sin IA)"),
+           agents.GENERADOR: ("Generador", "Arma el checklist"),
+           agents.CRITICO: ("Crítico", "Busca lo que se pasó por alto"),
+           agents.AUTORIZADOR: ("Autorizador", "Aplica la regla de decisión")}
+PASOS = {"analista": agents.ANALISTA, "checklist": agents.GENERADOR, "critico": agents.CRITICO,
+         "autorizador": agents.AUTORIZADOR}
+# En modo demo todo ocurre en décimas de segundo: una pausa breve deja ver el monitor en vivo.
+# La pausa se descuenta del tiempo de evaluación que se muestra en Impacto.
+PAUSA_MONITOR = 0.0 if agents.modo_ia() else float(os.getenv("PAUSA_MONITOR", "0.35"))
+
+
+def _quien(agente: str) -> str:
+    return f"{AVATARES.get(agente, '•')} {MONITOR.get(agente, (agente,))[0]}"
+
+
+def interaccion(ev: dict) -> str:
+    a, tipo = _quien(ev["agente"]), ev["tipo"]
+    if tipo == "objecion":
+        return f"{a} ➜ {_quien(agents.ANALISTA)} · objeta"
+    if tipo == "replica":
+        postura = "acepta" if (ev.get("datos") or {}).get("postura") == "acepta" else "discrepa"
+        return f"{a} ➜ {_quien(agents.CRITICO)} · responde ({postura})"
+    if tipo == "herramienta":
+        m = re.search(r"`(\w+)`", ev["texto"])
+        return f"{a} ➜ 🔧 {m.group(1) if m else 'herramienta'}"
+    if tipo == "regla":
+        return f"{a} ➜ 📏 regla fija (no IA)"
+    if tipo == "error":
+        return f"{a} · ⛔ la IA no respondió, usa respaldo"
+    return f"{a} · entrega su resultado"
+
+
+def html_monitor(eventos: list[dict], activo: str | None) -> str:
+    tarjetas = []
+    for agente, (nombre, rol_ag) in MONITOR.items():
+        propios = [e for e in eventos if e["agente"] == agente]
+        if agente == activo:
+            estado, color, clase = "⚙️ Trabajando", "#2F6FC4", "sg-activo"
+        elif propios:
+            estado, color, clase = "✅ Listo", "#2E7D4F", ""
+        else:
+            estado, color, clase = "⏳ Esperando", "#8A8F98", ""
+        ultimo = html.escape(propios[-1]["texto"].replace("`", "")[:80]) if propios else rol_ag
+        tarjetas.append(
+            f"<div class='sg-card {clase}' style='border-color:{color}'>"
+            f"<div style='font-size:22px'>{AVATARES.get(agente, '•')}</div><b>{nombre}</b>"
+            f"<div style='color:{color};font-weight:600;font-size:13px'>{estado} · {len(propios)} {'acción' if len(propios) == 1 else 'acciones'}</div>"
+            f"<div style='font-size:12px;color:#444;margin-top:4px'>{ultimo}</div></div>")
+    if activo is None and eventos:
+        barra = f"✅ Evaluación terminada · {len(eventos)} interacciones · la decisión final la tomó una regla fija"
+    elif eventos:
+        barra = "Ahora: " + html.escape(interaccion(eventos[-1]))
+    else:
+        barra = "Iniciando agentes..."
+    return ("<style>.sg-mon{display:flex;flex-wrap:wrap;gap:8px}.sg-card{flex:1 1 150px;padding:10px;border:2px solid;"
+            "border-radius:12px;background:#F7F9FC;color:#1F2328}.sg-activo{animation:sgp 1s infinite}"
+            "@keyframes sgp{50%{box-shadow:0 0 0 4px rgba(47,111,196,.25)}}"
+            ".sg-bar{margin-top:8px;padding:8px 12px;border-radius:10px;background:#1F2328;color:#fff;font-size:14px}</style>"
+            f"<div class='sg-mon'>{''.join(tarjetas)}</div><div class='sg-bar'>{barra}</div>")
 
 
 def diagrama(eventos: list[dict]) -> str:
@@ -151,12 +216,29 @@ if evaluar:
     tarea = {"titulo": security.sanitizar(titulo)[:120] or "Tarea sin nombre", "area": area, "turno": turno, "texto": texto}
 
     st.subheader("2. Los agentes están analizando")
+    monitor = st.empty()
+    vivo = {"eventos": [], "activo": agents.ANALISTA, "pausas": 0.0}
+    monitor.markdown(html_monitor([], vivo["activo"]), unsafe_allow_html=True)
+
+    def on_paso(k, msg):
+        vivo["activo"] = PASOS[k]
+        st.write(f"**{PASOS[k]}:** {msg}")
+        monitor.markdown(html_monitor(vivo["eventos"], vivo["activo"]), unsafe_allow_html=True)
+
+    def on_evento(ev):
+        vivo["eventos"].append(ev)
+        vivo["activo"] = ev["agente"]
+        st.caption(linea_evento(ev))
+        monitor.markdown(html_monitor(vivo["eventos"], vivo["activo"]), unsafe_allow_html=True)
+        if PAUSA_MONITOR:
+            time.sleep(PAUSA_MONITOR)
+            vivo["pausas"] += PAUSA_MONITOR
+
     with st.status("Trabajando...", expanded=True) as estado:
-        nombres = {"analista": "Analista de incidentes", "checklist": "Generador de checklist",
-                   "critico": "Crítico de seguridad", "autorizador": "Autorizador"}
-        resultado = agents.evaluar_tarea(df, tarea, lambda k, msg: st.write(f"**{nombres[k]}:** {msg}"),
-                                         lambda ev: st.caption(linea_evento(ev)))
+        resultado = agents.evaluar_tarea(df, tarea, on_paso, on_evento)
+        resultado["impacto"]["segundos"] = max(0.1, round(resultado["impacto"]["segundos"] - vivo["pausas"], 1))
         estado.update(label=f"Análisis completo en {resultado['impacto']['segundos']} s", state="complete", expanded=False)
+    monitor.empty()  # el monitor final se muestra junto al resultado
     st.session_state["resultado"] = resultado
     st.session_state["n_eval"] += 1
     st.session_state["ahorro_min"] += max(0.0, TIEMPO_MANUAL_MIN - resultado["impacto"]["segundos"] / 60)
@@ -182,6 +264,8 @@ if r:
     m3.metric("Controles a cumplir", len(r["checklist"]["controles"]))
     m4.metric("Tiempo de evaluación", f"{imp['segundos']} s", f"vs {TIEMPO_MANUAL_MIN:.0f} min a mano", delta_color="off")
     st.progress(r["riesgo"]["score"] / 100)
+    st.markdown("#### Monitor de agentes")
+    st.markdown(html_monitor(r["traza"], None), unsafe_allow_html=True)
 
     tab1, tab2, tab3 = st.tabs(["✅ Checklist y decisión", "🧠 Mapa de razonamiento", "📈 Impacto"])
 
