@@ -7,6 +7,7 @@ import time
 import streamlit as st
 
 import agents
+import condiciones
 import contractor_agent
 import security
 import skills
@@ -34,6 +35,11 @@ AVATARES = {agents.ANALISTA: "🔎", agents.GENERADOR: "📋", agents.CRITICO: "
 TIPOS = {"herramienta": "🔧 Usa herramienta", "respuesta": "💬 Responde", "objecion": "⚠️ Objeta",
          "replica": "↩️ Réplica", "regla": "📏 Regla fija (no IA)", "error": "⛔ Respaldo",
          "mensaje": "📨 Mensaje entre organizaciones"}
+
+
+@st.cache_data(ttl=600, show_spinner="Consultando el clima en Open-Meteo...")
+def clima_sede(sede: str) -> dict:
+    return condiciones.consultar_clima(sede)
 
 
 @st.cache_data
@@ -222,6 +228,23 @@ nombres_trab = {t["nombre"]: t["id"] for t in empresa["trabajadores"]} if empres
 asignados = c5.multiselect("Trabajadores asignados", list(nombres_trab), disabled=not empresa,
                            placeholder="Elige a quienes harán la tarea" if empresa else "Solo para contratistas")
 
+st.markdown("**Condiciones del día**")
+d1, d2, d3 = st.columns([2, 2, 1])
+sede = d1.selectbox("Sede", list(condiciones.SEDES))
+clima_auto = clima_sede(sede)
+clima_manual = d2.selectbox("Clima a usar", [f"Automático: {clima_auto['estado']}"] + condiciones.CLIMAS,
+                            help="Para la demo puedes forzar un clima distinto al real")
+clima = clima_auto["estado"] if clima_manual.startswith("Automático") else clima_manual
+horas = d3.number_input("Horas trabajadas", 0.0, 24.0, 8.0, 0.5, help="Más de 10 h = fatiga")
+if clima_auto["ok"]:
+    d1.caption(f"🌦️ {clima_auto['estado']} · {clima_auto['temp_c']:.0f} °C · viento {clima_auto['viento_kmh']:.0f} km/h · "
+               f"lluvia {clima_auto['lluvia_mm']} mm · código {clima_auto['codigo']} · consultado {clima_auto['hora']} · fuente Open-Meteo")
+else:
+    d1.warning(f"No se pudo consultar Open-Meteo ({clima_auto['error']}). Se usa clima Normal; puedes elegirlo a mano.")
+e1, e2 = st.columns([1, 3])
+simultaneas = e1.checkbox("Tareas simultáneas en la zona")
+simultaneas_desc = e2.text_input("¿Cuál?", disabled=not simultaneas, placeholder="Ej.: soldadura en la faja 2")
+
 b1, b2 = st.columns([3, 1])
 evaluar = b1.button("Evaluar tarea", type="primary", use_container_width=True)
 if b2.button("🛡️ Simular ataque", use_container_width=True,
@@ -266,7 +289,10 @@ if evaluar:
         skills.registrar_auditoria("entrada_bloqueada", {"alertas": alertas}, rol)
         st.stop()
     tarea = {"titulo": security.sanitizar(titulo)[:120] or "Tarea sin nombre", "area": area, "turno": turno, "texto": texto,
-             "contratista": empresa["id"] if empresa else None, "trabajadores": [nombres_trab[n] for n in asignados]}
+             "contratista": empresa["id"] if empresa else None, "trabajadores": [nombres_trab[n] for n in asignados],
+             "condiciones": {"sede": sede, "clima": clima, "clima_automatico": clima_auto["estado"] if clima_auto["ok"] else None,
+                             "horas": horas, "simultaneas": simultaneas,
+                             "simultaneas_desc": security.enmascarar_pii(security.sanitizar(simultaneas_desc))[:120]}}
 
     st.subheader("2. Los agentes están analizando")
     monitor = st.empty()
@@ -301,7 +327,7 @@ if evaluar:
 r = st.session_state.get("resultado")
 if r:
     dec = r["autorizacion"]["decision"]
-    clave = next(k for k in COLORES if dec.startswith(k))
+    clave = next(k for k in sorted(COLORES, key=len, reverse=True) if dec.startswith(k))  # el más largo primero
     imp = r["impacto"]
     st.subheader("3. Resultado")
     st.markdown(
@@ -336,7 +362,8 @@ if r:
                     st.caption(f"📜 {ref['norma']}{' · Art. ' + ref['articulo'] if ref.get('articulo') else ''}"
                                f" · {ref['tema']} · ⚠️ {ref['estado']}")
                 else:
-                    st.caption("💡 Control propuesto por los agentes · sin referencia normativa")
+                    st.caption(f"🌦️ Causado por la condición: {c['condicion']}" if c.get("condicion")
+                               else "💡 Control propuesto por los agentes · sin referencia normativa")
             pendientes = [c for c, ok in marcados if c["critico"] and not ok]
 
         with der:
@@ -358,7 +385,7 @@ if r:
             st.markdown(f"#### Aptitud de los trabajadores · según {apt['identidad']['organizacion']}")
             for x in apt["respuesta"]["respuestas"]:
                 (st.success if x["apto"] else st.error)(f"{'✅ Apto' if x['apto'] else '⛔ No apto'} · **{x['trabajador']}** — {x['motivo']}")
-        no_aptos = bool(apt and apt["no_aptos"])
+        no_aptos = bool(r["autorizacion"].get("bloqueo_duro") or (apt and apt["no_aptos"]))
 
         st.markdown("#### Decisión del responsable")
         critico_req = clave == "BLOQUEAR"
@@ -372,7 +399,8 @@ if r:
             skills.registrar_auditoria("rechazado", {"tarea": r["tarea"]["titulo"]}, rol)
             st.error("Tarea rechazada y registrada.")
         if no_aptos:
-            st.caption("Bloqueado por regla: hay trabajadores no aptos. Nadie puede autorizar hasta reemplazarlos y volver a evaluar.")
+            st.caption("Bloqueado por regla dura (trabajador no apto o tormenta eléctrica). Nadie puede autorizar: "
+                       "corrige la causa y vuelve a evaluar.")
         elif pendientes:
             st.caption(f"Faltan {len(pendientes)} controles obligatorios para poder autorizar.")
         elif not security.puede(rol, permiso):
@@ -416,6 +444,23 @@ if r:
                             st.rerun()
 
     with tab2:
+        cd = (r.get("condiciones") or {}).get("resumen") or {}
+        if cd:
+            st.markdown("#### Condiciones del día que recibieron todos los agentes")
+            k1, k2, k3, k4 = st.columns(4)
+            k1.metric("Sede", cd.get("sede", "-"))
+            k2.metric("Clima", cd.get("clima", "-"), "manual" if cd.get("clima_automatico") != cd.get("clima") else "Open-Meteo",
+                      delta_color="off")
+            k3.metric("Horas trabajadas", f"{cd.get('horas', 0):g} h", "fatiga" if cd.get("horas", 0) > condiciones.HORAS_FATIGA else "ok",
+                      delta_color="inverse" if cd.get("horas", 0) > condiciones.HORAS_FATIGA else "off")
+            k4.metric("Tareas simultáneas", "Sí" if cd.get("simultaneas") else "No")
+            efectos = r["condiciones"]
+            if efectos.get("bloqueo"):
+                st.error(f"⛔ Regla dura: {efectos['bloqueo']} → BLOQUEAR")
+            if efectos.get("riesgo_minimo"):
+                st.warning(f"⬆️ Regla dura: {efectos['riesgo_minimo']} → riesgo mínimo ALTO")
+            for c in efectos.get("controles", []):
+                st.caption(f"➕ {c['control']} · causado por: {c['condicion']}")
         st.markdown("#### Cómo llegaron los agentes a esta recomendación")
         st.graphviz_chart(diagrama(r["traza"]), use_container_width=True)
 
