@@ -300,6 +300,12 @@ if r:
             for i, c in enumerate(r["checklist"]["controles"]):
                 etiqueta = f"{'(!) ' if c['critico'] else ''}{c['control']}  ·  _{c['riesgo']}_"
                 marcados.append((c, st.checkbox(etiqueta, key=f"ctrl_{st.session_state['n_eval']}_{i}")))
+                ref = c.get("normativa")
+                if ref:
+                    st.caption(f"📜 {ref['norma']}{' · Art. ' + ref['articulo'] if ref.get('articulo') else ''}"
+                               f" · {ref['tema']} · ⚠️ {ref['estado']}")
+                else:
+                    st.caption("💡 Control propuesto por los agentes · sin referencia normativa")
             pendientes = [c for c, ok in marcados if c["critico"] and not ok]
 
         with der:

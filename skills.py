@@ -34,6 +34,34 @@ CONTROLES = {
     "Otros": ["Charla de 5 minutos con la cuadrilla", "Análisis de trabajo seguro (ATS) firmado"],
 }
 
+# Respaldo normativo de cada grupo de controles: Reglamento de Seguridad y Salud Ocupacional en Minería.
+# Sin números de artículo a propósito: ninguno fue verificado contra el texto oficial, así que todas las
+# referencias quedan como "por verificar". Si se confirma un artículo, se agrega aquí y se cambia el estado.
+NORMA_BASE = "D.S. 024-2016-EM y modificatorias"
+NORMATIVA = {
+    "Caída de altura": "Trabajos en altura",
+    "Atrapamiento": "Bloqueo y aislamiento de energías / guardas de máquinas",
+    "Proyección de partículas": "Sistemas presurizados y equipo de protección personal",
+    "Eléctrico": "Trabajos con energía eléctrica y bloqueo",
+    "Sustancias químicas": "Materiales y sustancias peligrosas",
+    "Vehículos y equipo móvil": "Transporte, tránsito y equipo móvil",
+    "Herramientas manuales": "Herramientas y equipo de protección personal",
+    "Corte": "Herramientas y equipo de protección personal",
+    "Quemadura": "Trabajos en caliente",
+    "Espacio confinado": "Trabajos en espacios confinados",
+    "Cargas suspendidas": "Izaje de cargas",
+    "Caída de rocas": "Desatado de rocas y sostenimiento",
+    "Caída al mismo nivel": "Orden, limpieza e iluminación",
+    "Animales venenosos": "Identificación de peligros y evaluación de riesgos (IPERC)",
+    "Otros": "Herramientas de gestión: IPERC, ATS y permisos de trabajo",
+}
+
+
+def referencia_normativa(clave: str) -> dict:
+    return {"norma": NORMA_BASE, "tema": NORMATIVA.get(clave, NORMATIVA["Otros"]), "articulo": None,
+            "estado": "por verificar"}
+
+
 # Riesgos críticos del dataset de Kaggle (en inglés) -> catálogo CONTROLES. Se revisa en orden: la primera
 # palabra clave que aparezca gana (p. ej. "Projection/Burning" cae en Proyección antes que en Quemadura).
 MAPEO_RIESGOS = [
@@ -190,7 +218,8 @@ def controles_base(riesgos: list[str]) -> list[dict]:
         for ctrl in CONTROLES[clave]:
             if ctrl not in vistos:
                 vistos.add(ctrl)
-                salida.append({"control": ctrl, "riesgo": clave, "critico": clave != "Otros"})
+                salida.append({"control": ctrl, "riesgo": clave, "critico": clave != "Otros",
+                               "normativa": referencia_normativa(clave)})
     return salida
 
 
