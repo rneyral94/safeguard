@@ -26,6 +26,13 @@ Las columnas en inglés se renombran solas y cada `Critical Risk` en inglés (Pr
   Supuesto del tiempo manual: 45 min = revisar historial (~20) + armar ATS/checklist (~15) + validar con otro supervisor (~10). Ajustable con `TIEMPO_MANUAL_MIN`.
   Costo con precios públicos por millón de tokens (Sonnet 5.5: US$2 entrada / US$10 salida).
 
+## Novedades
+
+- **Agente del Contratista** (`contractor_agent.py`, datos en `data/contratistas.json`): representa a otra empresa. El Autorizador le envía un mensaje estructurado (`consulta_aptitud`: riesgos + trabajadores) y el contratista responde por cada trabajador apto/no apto y el motivo, sin compartir su expediente (fechas, otras capacitaciones, datos personales). Si alguien no está apto para un riesgo detectado, la tarea se bloquea por regla y nadie puede autorizarla. El intercambio se ve como una conversación entre dos organizaciones, cada una con su identidad de agente.
+- **El sistema aprende**: después de autorizar, el supervisor cierra la tarea (sin novedad / casi-accidente / incidente). Los casi-accidentes e incidentes se guardan en `data/incidentes_nuevos.csv` (el dataset original no se toca) y la siguiente evaluación parecida ya los encuentra (aparecen como `NUEVO-xxxx`). El texto pasa por el mismo filtro anti-manipulación antes de entrar al historial.
+- **Normativa**: cada control del catálogo muestra su respaldo en el Reglamento de Seguridad y Salud Ocupacional en Minería (D.S. 024-2016-EM y modificatorias) y el tema que cubre. **Ninguna referencia tiene número de artículo: todas están marcadas "por verificar"** hasta contrastarlas con el texto oficial (`skills.NORMATIVA`).
+- **Monitor de agentes**: tarjetas en vivo con el estado de cada agente y quién le habla a quién.
+
 ## Agentes
 
 | Agente | Qué hace | Skills que usa |
@@ -33,8 +40,9 @@ Las columnas en inglés se renombran solas y cada `Critical Risk` en inglés (Pr
 | Analista de incidentes | Encuentra incidentes parecidos y el patrón de riesgo | buscar_incidentes_similares, estadisticas_riesgo |
 | Generador de checklist | Controles obligatorios del catálogo + máx. 3 por las condiciones del día | controles_base |
 | Crítico de seguridad | Desconfía del checklist y busca lo que se pasó por alto | — |
-| Autorizador | Decide por regla (no por IA) y explica en lenguaje simple | calcular_nivel_riesgo |
-| Humano | Marca controles en campo y autoriza según su rol | registrar_auditoria |
+| Autorizador | Decide por regla (no por IA), consulta al contratista y explica en lenguaje simple | calcular_nivel_riesgo |
+| Agente del Contratista (otra empresa) | Responde si cada trabajador está apto para los riesgos detectados | consulta_aptitud |
+| Humano | Marca controles en campo, autoriza según su rol y cierra la tarea reportando cómo terminó | registrar_auditoria, registrar_incidente_nuevo |
 
 ## Seguridad
 
