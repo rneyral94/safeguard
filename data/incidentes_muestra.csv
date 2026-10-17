@@ -1,0 +1,27 @@
+Data,Countries,Local,Industry Sector,Accident Level,Potential Accident Level,Genre,Employee or Third Party,Critical Risk,Description
+2016-01-05,Country_01,Local_01,Mining,I,IV,Male,Third Party,Caída de altura,Durante el cambio de polines en la faja transportadora a 5 metros el trabajador perdió el equilibrio en la plataforma sin línea de vida enganchada
+2016-01-12,Country_01,Local_02,Mining,II,V,Male,Employee,Atrapamiento,Al retirar la guarda de la faja en movimiento la mano del operador fue atrapada por el polín de retorno
+2016-01-20,Country_02,Local_03,Metals,I,III,Male,Third Party,Proyección de partículas,Al aflojar la brida de la bomba de relaves se liberó presión residual y proyectó lodo al rostro del mecánico
+2016-02-02,Country_01,Local_01,Mining,I,II,Male,Employee,Herramientas manuales,Durante el desmontaje del impulsor de la bomba la llave resbaló y golpeó la mano del técnico
+2016-02-10,Country_01,Local_04,Mining,III,V,Male,Employee,Eléctrico,Técnico intervino tablero de la chancadora sin bloqueo y recibió descarga al tocar borne energizado
+2016-02-18,Country_03,Local_05,Metals,I,IV,Male,Third Party,Sustancias químicas,Al ingresar al tanque de lixiviación para limpieza el trabajador inhaló vapores sin respirador adecuado
+2016-03-01,Country_01,Local_02,Mining,II,IV,Male,Employee,Vehículos y equipo móvil,Camión volquete en retroceso en zona de chancado primario no detectó a peatón por falta de vigía
+2016-03-09,Country_01,Local_01,Mining,I,III,Male,Third Party,Caída de altura,En turno noche con poca iluminación trabajador tropezó en pasarela de faja transportadora y cayó a nivel inferior
+2016-03-15,Country_02,Local_06,Metals,I,II,Female,Employee,Corte,Al manipular plancha metálica sin guantes anticorte la operadora sufrió corte en antebrazo
+2016-03-22,Country_01,Local_04,Mining,I,V,Male,Employee,Atrapamiento,Durante mantenimiento del molino otro operador arrancó el equipo porque no había etiqueta de bloqueo
+2016-04-04,Country_01,Local_03,Mining,II,IV,Male,Third Party,Quemadura,Trabajo de soldadura cerca de faja de jebe inició fuego por chispas sin vigía contra incendio
+2016-04-11,Country_03,Local_05,Metals,I,III,Male,Employee,Espacio confinado,Trabajador ingresó a cajón de bomba sin medición de gases y presentó mareo por baja de oxígeno
+2016-04-19,Country_01,Local_02,Mining,I,II,Male,Employee,Herramientas manuales,Al usar comba para alinear polín la herramienta rebotó y golpeó la pierna del trabajador
+2016-05-02,Country_01,Local_01,Mining,III,VI,Male,Third Party,Caída de altura,Andamio sin inspección colapsó durante cambio de chute en chancado primario con dos trabajadores sobre él
+2016-05-10,Country_02,Local_06,Metals,I,III,Male,Employee,Proyección de partículas,Esmerilado sin careta facial provocó ingreso de partícula al ojo del soldador
+2016-05-18,Country_01,Local_04,Mining,II,IV,Male,Employee,Eléctrico,Durante cambio de luminarias en turno noche trabajador contactó cable sin aislamiento en planta concentradora
+2016-06-01,Country_03,Local_05,Metals,I,IV,Male,Third Party,Sustancias químicas,Fuga en línea de cianuro durante mantenimiento de válvula en planta de lixiviación salpicó al técnico
+2016-06-09,Country_01,Local_02,Mining,I,III,Male,Employee,Vehículos y equipo móvil,Cargador frontal golpeó camioneta estacionada sin cuñas en zona de despacho de concentrado
+2016-06-16,Country_01,Local_03,Mining,II,V,Male,Third Party,Atrapamiento,Mecánico atrapado entre la bomba de relaves y la base al usar tecle sin coordinación con el operador
+2016-06-28,Country_01,Local_01,Mining,I,II,Male,Employee,Otros,Trabajador resbaló en piso con agua y barro en la sala de bombas sin señalización
+2016-07-05,Country_02,Local_06,Metals,I,III,Male,Employee,Quemadura,Contacto con tubería caliente de vapor durante inspección sin guantes térmicos
+2016-07-14,Country_01,Local_04,Mining,I,IV,Male,Third Party,Caída de altura,Trabajador sin arnés en techo de nave de molinos durante cambio de calaminas resbaló por la lluvia
+2016-07-22,Country_03,Local_05,Metals,II,V,Male,Employee,Espacio confinado,Rescate improvisado en tanque de solución sin plan de rescate expuso a un segundo trabajador a gases
+2016-08-03,Country_01,Local_02,Mining,I,III,Male,Employee,Proyección de partículas,Al cortar perno oxidado de faja transportadora salió proyectado un fragmento hacia el ayudante
+2016-08-12,Country_01,Local_01,Mining,I,II,Male,Third Party,Herramientas manuales,Uso de llave en mal estado en mantenimiento de bomba causó golpe en los dedos
+2016-08-25,Country_01,Local_03,Mining,II,IV,Male,Employee,Vehículos y equipo móvil,Volquete en zona de chancado avanzó con trabajadores en punto ciego por fatiga del operador en turno noche
