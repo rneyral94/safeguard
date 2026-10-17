@@ -13,6 +13,31 @@ streamlit run app.py
 python telegram_bot.py                # opcional, en otra terminal: recibe Aprobar/Rechazar
 ```
 
+## Configuración
+
+Ninguna clave va en el código ni en el repositorio.
+
+1. **Claves en `.env` local.** Copia la plantilla y completa solo lo que uses:
+   ```powershell
+   Copy-Item .env.example .env
+   ```
+   `.env.example` tiene solo los nombres de las variables, con valores vacíos. El `.env` con tus valores está en `.gitignore` y la app lo lee al arrancar.
+
+   | Variable | Para qué | Si falta |
+   |---|---|---|
+   | `ANTHROPIC_API_KEY` | Agentes con Claude | Modo demo sin IA |
+   | `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID` | Avisos de tareas bloqueadas | Sin Telegram |
+   | `DATASET_PATH` | CSV de Kaggle | Muestra incluida |
+   | `TIEMPO_MANUAL_MIN`, `PAUSA_MONITOR`, `ANTHROPIC_MODEL` | Ajustes de la demo | Valores por defecto |
+
+2. **Usuarios en `usuarios.json`**, que se genera en cada máquina:
+   ```powershell
+   python crear_usuarios.py
+   ```
+   Crea `operador`, `supervisor` y `jefe` con contraseñas al azar (se muestran una sola vez) y guarda solo su hash PBKDF2. `usuarios.json` está en `.gitignore`.
+
+3. **No se suben nunca:** `.env`, `usuarios.json`, `audit_log.jsonl`, `data/incidentes_nuevos.csv`, `.streamlit/secrets.toml`.
+
 ## Login y usuarios
 
 Tres usuarios: `operador` (evalúa), `supervisor` (autoriza), `jefe` (Jefe de Seguridad: autoriza casos críticos y ve la auditoría). Las contraseñas se guardan como hash PBKDF2 en `usuarios.json`, que está en `.gitignore`. Después de 5 intentos fallidos se bloquea el ingreso en la sesión.
