@@ -12,6 +12,7 @@ from sklearn.metrics.pairwise import cosine_similarity
 
 BASE = Path(__file__).parent
 AUDIT_FILE = BASE / "audit_log.jsonl"
+NUEVOS_FILE = BASE / "data" / "incidentes_nuevos.csv"  # reportes de cierre: no se toca el dataset original
 NIVELES = {"I": 1, "II": 2, "III": 3, "IV": 4, "V": 5, "VI": 6}
 
 # Catálogo de controles por riesgo crítico (base del checklist dinámico)
@@ -99,9 +100,15 @@ def expandir_consulta(texto: str) -> str:
 
 
 def cargar_incidentes(path: str | None = None) -> pd.DataFrame:
-    """Carga el dataset (Kaggle Industrial Safety o la muestra de demo) y normaliza columnas."""
+    """Carga el dataset (Kaggle Industrial Safety o la muestra de demo) más los reportes nuevos de los supervisores."""
     path = path or os.getenv("DATASET_PATH") or str(BASE / "data" / "incidentes_muestra.csv")
-    df = pd.read_csv(path)
+    df = _normalizar(pd.read_csv(path), "INC")
+    if NUEVOS_FILE.exists():
+        df = pd.concat([df, _normalizar(pd.read_csv(NUEVOS_FILE), "NUEVO")], ignore_index=True)
+    return df
+
+
+def _normalizar(df: pd.DataFrame, prefijo: str) -> pd.DataFrame:
     df = df.loc[:, ~df.columns.str.startswith("Unnamed")]
     df = df.rename(columns={"Data": "fecha", "Countries": "pais", "Local": "planta", "Industry Sector": "sector",
                             "Accident Level": "nivel_real", "Potential Accident Level": "nivel_potencial",
@@ -115,8 +122,19 @@ def cargar_incidentes(path: str | None = None) -> pd.DataFrame:
     for col in ("nivel_real", "nivel_potencial"):
         if col in df:
             df[col] = df[col].astype(str).str.strip()
-    df["id"] = [f"INC-{i + 1:04d}" for i in range(len(df))]
+    df["id"] = [f"{prefijo}-{i + 1:04d}" for i in range(len(df))]
     return df
+
+
+def registrar_incidente_nuevo(tipo: str, descripcion: str, riesgo: str, nivel_potencial: str, area: str) -> str:
+    """Agrega un casi-accidente o incidente reportado al cerrar una tarea. Devuelve su id."""
+    nuevo = pd.DataFrame([{"Data": datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "Countries": "Mina propia", "Local": area,
+                           "Industry Sector": "Mining", "Accident Level": "I" if tipo == "Casi-accidente" else "II",
+                           "Potential Accident Level": nivel_potencial, "Employee or Third Party": "Reporte de supervisor",
+                           "Critical Risk": riesgo, "Description": f"[{tipo}] {descripcion}"}])
+    previos = len(pd.read_csv(NUEVOS_FILE)) if NUEVOS_FILE.exists() else 0
+    nuevo.to_csv(NUEVOS_FILE, mode="a", header=not NUEVOS_FILE.exists(), index=False, encoding="utf-8")
+    return f"NUEVO-{previos + 1:04d}"
 
 
 def buscar_incidentes_similares(df: pd.DataFrame, descripcion_tarea: str, k: int = 5) -> list[dict]:

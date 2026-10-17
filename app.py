@@ -311,7 +311,7 @@ if r:
             with st.expander("Ver incidentes similares del historial"):
                 for s in r["analisis"]["similares"]:
                     original = s.get("riesgo_original", "")
-                    st.markdown(f"**{s['id']}** · {s['riesgo_critico']}"
+                    st.markdown(f"**{s['id']}**{' 🆕 reportado por un supervisor' if s['id'].startswith('NUEVO') else ''} · {s['riesgo_critico']}"
                                 f"{f' ({original})' if original and original != s['riesgo_critico'] else ''} · "
                                 f"gravedad potencial {s['nivel_potencial']} · parecido {int(s['similitud'] * 100)}%")
                     st.caption(s["descripcion"])
@@ -330,7 +330,7 @@ if r:
         if a1.button("Autorizar inicio", type="primary", use_container_width=True,
                      disabled=bool(pendientes) or no_aptos or not security.puede(rol, permiso)):
             skills.registrar_auditoria("autorizado", {"tarea": r["tarea"]["titulo"], "riesgo": r["riesgo"]["nivel"]}, rol)
-            st.success("Tarea autorizada y registrada en auditoría.")
+            st.session_state["autorizada"] = st.session_state["n_eval"]
         if a2.button("Rechazar", use_container_width=True):
             skills.registrar_auditoria("rechazado", {"tarea": r["tarea"]["titulo"]}, rol)
             st.error("Tarea rechazada y registrada.")
@@ -341,6 +341,42 @@ if r:
         elif not security.puede(rol, permiso):
             st.caption("Tu rol no puede autorizar esta tarea. Se requiere " +
                        ("Jefe de Seguridad." if critico_req else "Supervisor o superior."))
+
+        # ---------- Cierre: el supervisor reporta cómo terminó y el sistema aprende ----------
+        if st.session_state.get("autorizada") == st.session_state["n_eval"]:
+            st.success("Tarea autorizada y registrada en auditoría.")
+            cierre = st.session_state.get("cierre")
+            if cierre and cierre["eval"] == st.session_state["n_eval"]:
+                if cierre.get("id"):
+                    st.success(f"✅ Reporte guardado como **{cierre['id']}**. Este reporte ya forma parte del historial: "
+                               "la próxima evaluación parecida lo considerará.")
+                else:
+                    st.info("Tarea cerrada sin novedad y registrada en auditoría.")
+            else:
+                with st.form("cerrar_tarea"):
+                    st.markdown("#### Cerrar tarea · ¿cómo terminó?")
+                    resultado_cierre = st.radio("Resultado", ["Sin novedad", "Casi-accidente", "Incidente"], horizontal=True)
+                    gravedad = st.select_slider("Gravedad potencial (si hubo casi-accidente o incidente)",
+                                                ["I", "II", "III", "IV", "V", "VI"], value="III")
+                    detalle = st.text_area("¿Qué pasó? (corto)", height=80,
+                                           placeholder="Ej.: se soltó un polín y cayó cerca del ayudante, sin lesionados")
+                    if st.form_submit_button("Cerrar tarea", type="primary", use_container_width=True):
+                        texto_cierre, alertas_c = security.validar_entrada(detalle or resultado_cierre)
+                        if resultado_cierre != "Sin novedad" and alertas_c:
+                            # el historial lo leen los agentes: no se guarda nada sospechoso ni vacío
+                            for a in alertas_c:
+                                st.error(a)
+                        else:
+                            nuevo_id = None
+                            if resultado_cierre != "Sin novedad":
+                                nuevo_id = skills.registrar_incidente_nuevo(
+                                    resultado_cierre, f"{texto_cierre} Tarea: {r['tarea']['texto']}",
+                                    r["analisis"]["riesgos_detectados"][0], gravedad, r["tarea"]["area"] or "Sin área")
+                                datos.clear()  # la próxima evaluación recarga el historial con el nuevo caso
+                            skills.registrar_auditoria("tarea_cerrada", {"tarea": r["tarea"]["titulo"],
+                                                       "resultado": resultado_cierre, "id": nuevo_id}, rol)
+                            st.session_state["cierre"] = {"eval": st.session_state["n_eval"], "id": nuevo_id}
+                            st.rerun()
 
     with tab2:
         st.markdown("#### Cómo llegaron los agentes a esta recomendación")
