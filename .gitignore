@@ -4,3 +4,6 @@ audit_log.jsonl
 .env
 data/incidentes_nuevos.csv
 usuarios.json
+.streamlit/secrets.toml
+*.pem
+*.key

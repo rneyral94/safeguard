@@ -2,7 +2,36 @@
 
 Antes de autorizar una tarea, 4 agentes de IA revisan qué salió mal antes en tareas parecidas y arman un checklist dinámico. El supervisor decide.
 
-## Correr en 3 pasos
+## Correr en PowerShell
+
+```powershell
+python -m venv .venv; .\.venv\Scripts\Activate.ps1
+pip install -r requirements.txt
+python crear_usuarios.py              # crea usuarios.json (operador, supervisor, jefe) y muestra las contraseñas una vez
+# Opcional: archivo .env (no se sube) con ANTHROPIC_API_KEY=..., TELEGRAM_BOT_TOKEN=..., TELEGRAM_CHAT_ID=...
+streamlit run app.py
+python telegram_bot.py                # opcional, en otra terminal: recibe Aprobar/Rechazar
+```
+
+## Login y usuarios
+
+Tres usuarios: `operador` (evalúa), `supervisor` (autoriza), `jefe` (Jefe de Seguridad: autoriza casos críticos y ve la auditoría). Las contraseñas se guardan como hash PBKDF2 en `usuarios.json`, que está en `.gitignore`. Después de 5 intentos fallidos se bloquea el ingreso en la sesión.
+
+## Condiciones del día
+
+- **Clima automático** por sede (Cerro de Pasco, Arequipa, Cajamarca) con Open-Meteo (gratis, sin clave): código de clima, lluvia, viento, temperatura. Se clasifica en Normal, Lluvia, Viento fuerte (> 40 km/h), Tormenta eléctrica (códigos 95-99) o Helada (< 0 °C). Se muestra la hora de consulta y la fuente; se puede forzar a mano para la demo. Sin red: se usa Normal y se avisa.
+- **Horas trabajadas** (> 10 h = fatiga) y **tareas simultáneas** en la zona.
+- Reglas duras (también sin IA): tormenta eléctrica + altura o eléctrico → BLOQUEAR (nadie puede autorizar); lluvia o viento fuerte + altura → riesgo mínimo ALTO y controles extra; fatiga → el Crítico exige relevo o pausa; tareas simultáneas → coordinación entre supervisores y bloqueo compartido de energía. Cada control dice qué condición lo causó.
+
+## Telegram (opcional)
+
+Solo las tareas BLOQUEADAS envían un aviso (tarea, sede, clima, riesgo, 3 motivos) con botones Aprobar/Rechazar. `telegram_bot.py` escucha con long polling y registra la respuesta en la auditoría con el usuario de Telegram; la app la muestra al refrescar. La respuesta queda como registro: no salta las reglas duras ni los permisos de la app. Solo el chat configurado puede responder. Sin token o sin red, la app funciona igual.
+
+1. En Telegram, abre **@BotFather** → `/newbot` → nombre y usuario (terminado en `bot`) → copia el token.
+2. Pon el token en `.env` como `TELEGRAM_BOT_TOKEN=...` y ejecuta `python telegram_bot.py`.
+3. Escríbele `/start` a tu bot: responde con tu `chat_id`. Ponlo en `.env` como `TELEGRAM_CHAT_ID=...` y reinicia el bot y la app.
+
+## Correr en 3 pasos (bash)
 
 ```bash
 pip install -r requirements.txt
