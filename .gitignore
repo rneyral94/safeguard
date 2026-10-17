@@ -7,3 +7,4 @@ usuarios.json
 .streamlit/secrets.toml
 *.pem
 *.key
+PRUEBAS_LOCAL.txt
