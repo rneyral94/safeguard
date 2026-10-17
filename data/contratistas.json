@@ -1,0 +1,25 @@
+{
+  "empresas": [
+    {
+      "id": "montajes-andinos",
+      "nombre": "Montajes Andinos S.A.C.",
+      "seguro_sctr_vence": "2027-03-31",
+      "trabajadores": [
+        {"id": "MA-01", "nombre": "Carlos Quispe", "capacitaciones": {"trabajo_en_altura": "2027-05-10", "espacio_confinado": "2027-01-20", "trabajo_en_caliente": "2026-12-15", "electrico": "2027-02-28"}},
+        {"id": "MA-02", "nombre": "Luis Mamani", "capacitaciones": {"trabajo_en_altura": "2026-08-31", "trabajo_en_caliente": "2027-04-30"}},
+        {"id": "MA-03", "nombre": "Rosa Huamán", "capacitaciones": {"trabajo_en_altura": "2027-06-30", "espacio_confinado": "2027-06-30", "electrico": "2027-06-30"}},
+        {"id": "MA-04", "nombre": "Jorge Ccori", "capacitaciones": {"trabajo_en_altura": "2027-02-14", "electrico": "2026-09-30"}}
+      ]
+    },
+    {
+      "id": "servicios-mineros-del-sur",
+      "nombre": "Servicios Mineros del Sur E.I.R.L.",
+      "seguro_sctr_vence": "2027-01-15",
+      "trabajadores": [
+        {"id": "SM-01", "nombre": "Ana Condori", "capacitaciones": {"espacio_confinado": "2027-04-01", "trabajo_en_caliente": "2027-04-01"}},
+        {"id": "SM-02", "nombre": "Pedro Apaza", "capacitaciones": {"trabajo_en_altura": "2027-03-20", "espacio_confinado": "2026-07-15", "electrico": "2027-03-20"}},
+        {"id": "SM-03", "nombre": "Miguel Torres", "capacitaciones": {"trabajo_en_altura": "2027-08-01", "espacio_confinado": "2027-08-01", "trabajo_en_caliente": "2027-08-01", "electrico": "2027-08-01"}}
+      ]
+    }
+  ]
+}

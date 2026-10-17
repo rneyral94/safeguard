@@ -9,6 +9,7 @@ from contextvars import ContextVar
 from dataclasses import dataclass, field
 from typing import Callable
 
+import contractor_agent
 import skills
 
 MODELO = os.getenv("ANTHROPIC_MODEL", "claude-sonnet-5-5")
@@ -250,21 +251,45 @@ def agente_critico(tarea: dict, analisis: dict, checklist: dict) -> dict:
 
 # ---------------- Agente 4: Autorizador ----------------
 AUTORIZADOR = "Autorizador"
+CONTRATISTA = "Agente del Contratista"
+ID_AUTORIZADOR = "agente.safeguard.mina.autorizador"
 
 
-def agente_autorizador(riesgo: dict, critico: dict) -> dict:
+def consultar_contratista(tarea: dict, analisis: dict) -> dict | None:
+    """Mensaje agente a agente entre organizaciones: la mina pregunta, el contratista responde apto/no apto."""
+    if not tarea.get("contratista") or not tarea.get("trabajadores"):
+        return None
+    mensaje = {"tipo": "consulta_aptitud", "de": ID_AUTORIZADOR, "para": contractor_agent.identidad(tarea["contratista"])["agente_id"],
+               "empresa": tarea["contratista"], "riesgos": analisis["riesgos_detectados"], "trabajadores": tarea["trabajadores"]}
+    _evento(AUTORIZADOR, "mensaje", f"Consulta al contratista la aptitud de {len(tarea['trabajadores'])} trabajadores "
+            f"para: {', '.join(mensaje['riesgos'])}", mensaje)
+    respuesta = contractor_agent.responder(mensaje)
+    no_aptos = [x for x in respuesta["respuestas"] if not x["apto"]]
+    _evento(CONTRATISTA, "mensaje", f"{len(respuesta['respuestas']) - len(no_aptos)} aptos, {len(no_aptos)} no aptos"
+            + (": " + "; ".join(f"{x['trabajador']} ({x['motivo']})" for x in no_aptos) if no_aptos else "."), respuesta)
+    return {"identidad": contractor_agent.identidad(tarea["contratista"]), "mensaje": mensaje, "respuesta": respuesta,
+            "no_aptos": no_aptos}
+
+
+def agente_autorizador(riesgo: dict, critico: dict, aptitud: dict | None = None) -> dict:
     """Regla dura primero (no negociable por la IA); la IA solo redacta la justificación."""
-    if riesgo["nivel"] == "CRÍTICO":
+    if aptitud and aptitud["no_aptos"]:
+        decision = "BLOQUEAR: trabajador no apto"
+    elif riesgo["nivel"] == "CRÍTICO":
         decision = "BLOQUEAR hasta revisión del Jefe de Seguridad"
     elif riesgo["nivel"] == "ALTO" or critico.get("controles_faltantes"):
         decision = "APROBAR CON CONDICIONES"
     else:
         decision = "APROBAR"
     _evento(AUTORIZADOR, "regla", f"Regla fija: riesgo {riesgo['nivel']} ({riesgo['score']}/100)"
-            f"{' + controles exigidos por el Crítico' if critico.get('controles_faltantes') else ''} → {decision}. "
+            f"{' + controles exigidos por el Crítico' if critico.get('controles_faltantes') else ''}"
+            f"{' + trabajador no apto según el contratista' if aptitud and aptitud['no_aptos'] else ''} → {decision}. "
             "La IA no puede cambiar esta decisión.")
     justificacion = f"Riesgo {riesgo['nivel']} ({riesgo['score']}/100). {riesgo['base']}."
-    if modo_ia():
+    if aptitud and aptitud["no_aptos"]:
+        justificacion = ("No apto según su empresa: " + "; ".join(f"{x['trabajador']} — {x['motivo']}" for x in aptitud["no_aptos"])
+                         + ". Reemplázalo o regulariza su capacitación y vuelve a evaluar.")
+    if modo_ia() and not (aptitud and aptitud["no_aptos"]):
         r = _llamar(AUTORIZADOR, REGLAS_COMUNES + " Rol: AUTORIZADOR. La decisión ya fue tomada por reglas y NO puedes "
                     "cambiarla. Explícala en 2 frases simples para un supervisor de campo. Devuelve {\"justificacion\": str}.",
                     json.dumps({"decision": decision, "riesgo": riesgo, "critico": critico}, ensure_ascii=False))
@@ -293,15 +318,16 @@ def evaluar_tarea(df, tarea: dict, on_paso=None, on_evento=None) -> dict:
         debate = agente_analista_replica(tarea, analisis, critico)
         for c in critico.get("controles_faltantes", [])[:2]:
             checklist["controles"].append({"control": c, "riesgo": "Agregado por el Crítico", "critico": True})
-        paso("autorizador", "Tomando la decisión")
-        autorizacion = agente_autorizador(riesgo, critico)
+        paso("autorizador", "Consultando al contratista y tomando la decisión")
+        aptitud = consultar_contratista(tarea, analisis)
+        autorizacion = agente_autorizador(riesgo, critico, aptitud)
     finally:
         _traza.reset(token)
     impacto = {"segundos": round(time.perf_counter() - inicio, 1), "llamadas_ia": traza.llamadas,
                "tokens_entrada": traza.tokens_entrada, "tokens_salida": traza.tokens_salida,
                "costo_usd": traza.costo_usd(), "modelo": MODELO if modo_ia() else "sin IA (demo)"}
     resultado = {"tarea": tarea, "analisis": analisis, "riesgo": riesgo, "checklist": checklist,
-                 "critico": critico, "debate": debate, "autorizacion": autorizacion, "traza": traza.eventos,
+                 "critico": critico, "debate": debate, "aptitud": aptitud, "autorizacion": autorizacion, "traza": traza.eventos,
                  "impacto": impacto, "modo": "IA" if modo_ia() else "Demo"}
     skills.registrar_auditoria("evaluacion", {"tarea": tarea["titulo"], "riesgo": riesgo["nivel"],
                                               "decision": autorizacion["decision"],
