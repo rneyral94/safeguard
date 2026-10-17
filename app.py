@@ -9,6 +9,7 @@ import streamlit as st
 import agents
 import condiciones
 import contractor_agent
+import notificador
 import security
 import skills
 
@@ -318,6 +319,8 @@ if evaluar:
         resultado["impacto"]["segundos"] = max(0.1, round(resultado["impacto"]["segundos"] - vivo["pausas"], 1))
         estado.update(label=f"Análisis completo en {resultado['impacto']['segundos']} s", state="complete", expanded=False)
     monitor.empty()  # el monitor final se muestra junto al resultado
+    if resultado["autorizacion"]["decision"].startswith("BLOQUEAR"):  # Telegram solo para bloqueadas
+        resultado["telegram"] = notificador.enviar_bloqueo(resultado) if notificador.configurado() else None
     st.session_state["resultado"] = resultado
     st.session_state["n_eval"] += 1
     st.session_state["ahorro_min"] += max(0.0, TIEMPO_MANUAL_MIN - resultado["impacto"]["segundos"] / 60)
@@ -386,6 +389,19 @@ if r:
             for x in apt["respuesta"]["respuestas"]:
                 (st.success if x["apto"] else st.error)(f"{'✅ Apto' if x['apto'] else '⛔ No apto'} · **{x['trabajador']}** — {x['motivo']}")
         no_aptos = bool(r["autorizacion"].get("bloqueo_duro") or (apt and apt["no_aptos"]))
+
+        if clave == "BLOQUEAR":
+            if r.get("telegram"):
+                resp_tg = notificador.respuesta(r["telegram"])
+                if resp_tg:
+                    (st.success if resp_tg["detalle"]["respuesta"] == "aprobar" else st.error)(
+                        f"📲 Respuesta por Telegram: **{resp_tg['detalle']['respuesta'].upper()}** por {resp_tg['usuario']} "
+                        f"({resp_tg['fecha']}). Queda en auditoría; la regla dura y los permisos de la app siguen vigentes.")
+                else:
+                    st.info(f"📲 Aviso {r['telegram']} enviado por Telegram al responsable. Esperando respuesta...")
+                    st.button("Refrescar respuesta de Telegram")
+            else:
+                st.caption("📲 Telegram no configurado o sin red: el aviso no se envió (la app funciona igual).")
 
         st.markdown("#### Decisión del responsable")
         critico_req = clave == "BLOQUEAR"
