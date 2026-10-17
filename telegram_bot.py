@@ -4,6 +4,7 @@ Ejecutar en otra terminal: python telegram_bot.py   (requiere TELEGRAM_BOT_TOKEN
 import os
 
 from telegram import Update
+from telegram.error import NetworkError
 from telegram.ext import Application, CallbackQueryHandler, CommandHandler, ContextTypes
 
 import agents  # noqa: F401  (carga .env igual que la app)
@@ -30,6 +31,15 @@ async def boton(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     await q.edit_message_text(q.message.text + f"\n\n{'✅ APROBADO' if accion == 'aprobar' else '❌ RECHAZADO'} por {nombre}")
 
 
+async def error(update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Errores de red (Wi-Fi o hotspot que se corta): una línea en vez del traceback; la librería reintenta sola."""
+    e = context.error
+    if isinstance(e, NetworkError):
+        print(f"[sin conexión con Telegram, reintentando...] {e}")
+    else:
+        print(f"[error del bot] {type(e).__name__}: {e}")
+
+
 def main() -> None:
     token = os.getenv("TELEGRAM_BOT_TOKEN")
     if not token:
@@ -37,6 +47,7 @@ def main() -> None:
     app = Application.builder().token(token).build()
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CallbackQueryHandler(boton))
+    app.add_error_handler(error)
     print("Bot de SafeGuard escuchando (long polling). Ctrl+C para salir.")
     app.run_polling(allowed_updates=Update.ALL_TYPES)
 
